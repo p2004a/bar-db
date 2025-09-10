@@ -70,6 +70,13 @@ export class MapProcessor extends FileProcessor {
 }
 
 export function mapDataToMapSchema(mapData: SpringMap) : Omit<DBSchema.SpringMap.Schema, "id"> {
+    // If parsed as object, e.g. is present but empty (maps to empty object
+    // because that's how lua works) or in any case if it's not array but set,
+    // let's just coalesce to empty array...
+    let teams = mapData.mapInfo?.teams;
+    if (teams && !Array.isArray(teams)) {
+        teams = [];
+    }
     return {
         fileName: mapData.fileName,
         fileNameWithExt: mapData.fileNameWithExt,
@@ -82,7 +89,7 @@ export function mapDataToMapSchema(mapData: SpringMap) : Omit<DBSchema.SpringMap
         extractorRadius: mapData.mapInfo?.extractorRadius ?? mapData.smd?.extractorRadius,
         minWind: mapData.mapInfo?.atmosphere?.minWind ?? mapData.smd?.minWind,
         maxWind: mapData.mapInfo?.atmosphere?.maxWind ?? mapData.smd?.maxWind,
-        startPositions: (mapData.mapInfo?.teams?.map(obj => obj!.startPos) ?? mapData.smd?.startPositions) as Array<StartPos>,
+        startPositions: (teams?.map(obj => obj!.startPos) ?? mapData.smd?.startPositions) as Array<StartPos>,
         width: mapData.smf!.mapWidthUnits * 2,
         height: mapData.smf!.mapHeightUnits * 2,
         minDepth: mapData.minHeight,
