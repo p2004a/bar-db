@@ -8,7 +8,7 @@ import {PluginOptions} from "~/rest-api";
 import {isTuple} from "~/utils/tuple-check";
 
 const plugin: FastifyPluginCallback<PluginOptions> = async function (app, {db, redis, schemaManager}) {
-    const userNameIdMap: { [username: string]: number } = {};
+    const playerNameToUserIdsMap: { [username: string]: number[] } = {};
 
     app.route<{ Querystring: ReplaysQueryType; Reply: PaginateReplyType<DBSchema.Demo.Schema> }>({
         method: "GET",
@@ -163,17 +163,15 @@ const plugin: FastifyPluginCallback<PluginOptions> = async function (app, {db, r
             having: Sequelize.literal(`COUNT(*) = COUNT(CASE WHEN "AllyTeams->Players"."trueSkill" BETWEEN ${trueSkillMin} AND ${trueSkillMax} THEN 1 END)`)
         });
 
-        const foundDemoIds = foundDemos.map(demo => demo.id);
-
-        return foundDemoIds;
+        return foundDemos.map(demo => demo.id);
     }
 
     async function getPlayerDemoIds(players: string[]) {
         const userIds: number[] = [];
         for (const name of players) {
-            const userId = await getPlayerUserId(name);
-            if (userId !== undefined) {
-                userIds.push(userId);
+            const userIdsForPlayerName = await getUserIdsForPlayerName(name);
+            if (userIdsForPlayerName !== undefined) {
+                userIds.push(...userIdsForPlayerName);
             }
         }
 
@@ -197,26 +195,27 @@ const plugin: FastifyPluginCallback<PluginOptions> = async function (app, {db, r
             group: ["Demo.id"],
         });
 
-        const foundDemoIds = foundDemos.map(demo => demo.id);
-
-        return foundDemoIds;
+        return foundDemos.map(demo => demo.id);
     }
 
-    async function getPlayerUserId(playerName: string): Promise<number | undefined> {
-        const userId = userNameIdMap[playerName];
+    async function getUserIdsForPlayerName(playerName: string): Promise<number[] | undefined> {
+        const userIds = playerNameToUserIdsMap[playerName];
 
-        if (userId === undefined) {
+        if (userIds === undefined) {
             const userLookupStr = await redis.get("users");
             if (userLookupStr) {
                 const users = JSON.parse(userLookupStr) as Array<{ id: number, username: string, countryCode: string }>;
                 for (const user of users) {
-                    userNameIdMap[user.username] = user.id;
+                    if (!playerNameToUserIdsMap[user.username]) {
+                        playerNameToUserIdsMap[user.username] = [];
+                    }
+                    playerNameToUserIdsMap[user.username].push(user.id);
                 }
-                return userNameIdMap[playerName];
+                return playerNameToUserIdsMap[playerName];
             }
         }
 
-        return userId;
+        return userIds;
     }
 };
 
