@@ -167,13 +167,14 @@ const plugin: FastifyPluginCallback<PluginOptions> = async function (app, {db, r
     }
 
     async function getPlayerDemoIds(players: string[]) {
-        const userIds: number[] = [];
+        let userIds: number[] = [];
         for (const name of players) {
             const userIdsForPlayerName = await getUserIdsForPlayerName(name);
             if (userIdsForPlayerName !== undefined) {
                 userIds.push(...userIdsForPlayerName);
             }
         }
+        userIds = Array.from(new Set(userIds));
 
         const foundDemos = await db.schema.demo.findAll({
             attributes: ["id"],
@@ -193,6 +194,7 @@ const plugin: FastifyPluginCallback<PluginOptions> = async function (app, {db, r
                 required: true
             }],
             group: ["Demo.id"],
+            having: Sequelize.literal(`COUNT(*) >= ${players.length}`)
         });
 
         return foundDemos.map(demo => demo.id);
