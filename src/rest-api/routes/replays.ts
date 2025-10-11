@@ -1,14 +1,13 @@
-import { FastifyPluginCallback } from "fastify";
-import { AndOperator, FindAndCountOptions, Op, OrOperator, Sequelize, WhereAttributeHash } from "sequelize";
-import { Database } from "~/database";
-import { DBSchema } from "~/model/db";
-import { paginateReplySchema, PaginateReplyType } from "~/model/rest-api/pagination";
-import { replaysQuerySchema, ReplaysQueryType } from "~/model/rest-api/replays";
-import { PluginOptions } from "~/rest-api";
-import { isTuple } from "~/utils/tuple-check";
-const { JsonSchema7Strategy } = require('@alt3/sequelize-to-json-schemas');
+import {FastifyPluginCallback} from "fastify";
+import {AndOperator, FindAndCountOptions, Op, OrOperator, Sequelize, WhereAttributeHash} from "sequelize";
 
-const plugin: FastifyPluginCallback<PluginOptions> = async function(app, { db, redis, schemaManager }) {
+import {DBSchema} from "~/model/db";
+import {PaginateReplyType} from "~/model/rest-api/pagination";
+import {replaysQuerySchema, ReplaysQueryType} from "~/model/rest-api/replays";
+import {PluginOptions} from "~/rest-api";
+import {isTuple} from "~/utils/tuple-check";
+
+const plugin: FastifyPluginCallback<PluginOptions> = async function (app, {db, redis, schemaManager}) {
     const userNameIdMap: { [username: string]: number } = {};
 
     app.route<{ Querystring: ReplaysQueryType; Reply: PaginateReplyType<DBSchema.Demo.Schema> }>({
@@ -62,14 +61,14 @@ const plugin: FastifyPluginCallback<PluginOptions> = async function(app, { db, r
                     dateRange.push(sameDay);
                 }
                 if (isTuple(dateRange)) {
-                    demoWhere.startTime = { [Op.between]: dateRange }
+                    demoWhere.startTime = {[Op.between]: dateRange};
                 }
             }
 
             if (durationRangeMins) {
-                const durationRangeMs = durationRangeMins.map(min => min * 1000 * 60)
+                const durationRangeMs = durationRangeMins.map(min => min * 1000 * 60);
                 if (isTuple(durationRangeMs)) {
-                    demoWhere.durationMs = { [Op.between]: durationRangeMs };
+                    demoWhere.durationMs = {[Op.between]: durationRangeMs};
                 }
             }
 
@@ -87,14 +86,16 @@ const plugin: FastifyPluginCallback<PluginOptions> = async function(app, { db, r
 
             if (demoIds.length) {
                 demoWhere.id = {
-                    [Op.and]: demoIds.map((ids) => { return { [Op.in]: ids }; })
+                    [Op.and]: demoIds.map((ids) => {
+                        return {[Op.in]: ids};
+                    })
                 };
             }
 
             if (maps) {
-                mapWhere.scriptName = { [Op.or]: maps };
+                mapWhere.scriptName = {[Op.or]: maps};
             }
-            
+
             const query: FindAndCountOptions<DBSchema.Demo.Schema> = {
                 offset: (page - 1) * limit,
                 limit,
@@ -134,12 +135,12 @@ const plugin: FastifyPluginCallback<PluginOptions> = async function(app, { db, r
             try {
                 let data, totalResults;
                 if (computeTotalResults) {
-                    ({ count: totalResults, rows: data } = await db.schema.demo.findAndCountAll(query));
+                    ({count: totalResults, rows: data} = await db.schema.demo.findAndCountAll(query));
                 } else {
                     data = await db.schema.demo.findAll(query);
                     totalResults = -1;
                 }
-                return { totalResults, page, limit, data };
+                return {totalResults, page, limit, data};
             } catch (err) {
                 console.log(err);
                 throw err;
@@ -161,9 +162,9 @@ const plugin: FastifyPluginCallback<PluginOptions> = async function(app, { db, r
             group: ["Demo.id"],
             having: Sequelize.literal(`COUNT(*) = COUNT(CASE WHEN "AllyTeams->Players"."trueSkill" BETWEEN ${trueSkillMin} AND ${trueSkillMax} THEN 1 END)`)
         });
-    
+
         const foundDemoIds = foundDemos.map(demo => demo.id);
-    
+
         return foundDemoIds;
     }
 
@@ -201,13 +202,13 @@ const plugin: FastifyPluginCallback<PluginOptions> = async function(app, { db, r
         return foundDemoIds;
     }
 
-    async function getPlayerUserId(playerName: string) : Promise<number | undefined> {
+    async function getPlayerUserId(playerName: string): Promise<number | undefined> {
         const userId = userNameIdMap[playerName];
 
         if (userId === undefined) {
             const userLookupStr = await redis.get("users");
             if (userLookupStr) {
-                const users = JSON.parse(userLookupStr) as Array<{ id: number, username: string, countryCode: string}>;
+                const users = JSON.parse(userLookupStr) as Array<{ id: number, username: string, countryCode: string }>;
                 for (const user of users) {
                     userNameIdMap[user.username] = user.id;
                 }
